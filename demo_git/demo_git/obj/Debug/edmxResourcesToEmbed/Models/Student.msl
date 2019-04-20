@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Mapping Space="C-S" xmlns="http://schemas.microsoft.com/ado/2009/11/mapping/cs">
+  <EntityContainerMapping StorageEntityContainer="TRAINModelStoreContainer" CdmEntityContainer="TRAIN_GIT">
+    <EntitySetMapping Name="Employee_700">
+      <EntityTypeMapping TypeName="TRAINModel.Employee_700">
+        <MappingFragment StoreEntitySet="Employee_700">
+          <ScalarProperty Name="userid" ColumnName="userid" />
+          <ScalarProperty Name="username" ColumnName="username" />
+          <ScalarProperty Name="gender" ColumnName="gender" />
+          <ScalarProperty Name="city" ColumnName="city" />
+          <ScalarProperty Name="languages" ColumnName="languages" />
+          <ScalarProperty Name="Items" ColumnName="Items" />
+          <ScalarProperty Name="orderdate" ColumnName="orderdate" />
+          <ScalarProperty Name="address" ColumnName="address" />
+          <ScalarProperty Name="salary" ColumnName="salary" />
+          <ScalarProperty Name="marks" ColumnName="marks" />
+          <ScalarProperty Name="age" ColumnName="age" />
+        </MappingFragment>
+      </EntityTypeMapping>
+    </EntitySetMapping>
+  </EntityContainerMapping>
+</Mapping>
