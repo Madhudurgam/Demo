@@ -1,7 +1,7 @@
 ﻿/*---------------------------------------------------------------------
 CREATED BY: -		N Vamsi Rajesh
 DESCRIPTION: -		Migrating non Office 365 OAuthAccount Claims To Groups.
-MODIFIED DATE: -	2019-06-26
+MODIFIED DATE: -	2019-06-19
 COMMENTS: -			Regarding PLAT-2862, Consolidated script for migrating OAuthAccount Claims to Groups.
 						STEP-1: - Create new Groups for OAuthAccount						
 						STEP-2: - OAuthAccount associate to Groups
@@ -13,7 +13,6 @@ CHID	Name            Date              Description
 ----	----------      ---------------   ------------                          
 1		Vamsi Rajesh    2019-05-10		  Created
 2		Vamsi Rajesh	2019-06-13		  Modified script for not associated users With Patner and added except condition for 'Welsfargo' and 'Punchout' claims.
-3.      Vamsi Rajesh    2109-06-25        modified script in  "OAuthAccount associate to Groups"  for "Welsfargo' and 'punchout' claims and  adding "azu.renna" user to  "NNA.Apps.IT.Eng.Staff.Group"
 ---------------------------------------------------------------------*/
 
 PRINT 'STEP-1: - Create new Groups for OAuthAccount'
@@ -211,30 +210,6 @@ INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
 LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
 WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1 
 
-Go
-
-PRINT 'Associate Customer claim to NNA.Apps.B2B.NotaryUser.Group' --CHID-3
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
-(
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Customer'
-
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1 
- 
- Go
-
 PRINT 'Associate User claims except Admin +Order place to Groups' --CHID-2
 
 INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
@@ -429,40 +404,6 @@ WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1
 
 Go
 
-
-PRINT 'Associate PunchOut to Groups not including  Administrator and NNA.Orders.Place claims '  --CHID-3
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
-(
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='PunchOut'
-
-	INTERSECT
-
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='User'
-
-    INTERSECT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Customer'
-		
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1
-
-
 PRINT 'Associate WellsFargo to Groups'
 
 DECLARE @GroupName VARCHAR(100)='NNA.Apps.B2B.WellsFargoUser.Group'
@@ -505,74 +446,6 @@ LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAut
 WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1 
 
 GO
-
-
-PRINT 'Associate WellsFargo to Groups not including  NNA.Orders.Place claim also'  --CHID-3
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
-(
-   SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='WellsFargo'	
-		
-	INTERSECT 
-
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='User'
-
-    INTERSECT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Customer'
-
-		
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1 
-
-Go
-
-PRINT 'STEP-2: - OAuthAccount associate to  "azu.renna"  UserName' --CHID --3
-
-
-DECLARE @GroupName VARCHAR(100)='NNA.Apps.IT.Eng.Staff.Group'
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
-(
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Administrator'
-
-    INTERSECT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Universal'
-				
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID =1 AND U.UserName ='azu.renna'
-
-Go
-
 PRINT '------------------------END-----------------------------------'
 
 PRINT 'STEP-3: - Create new Trusted Notary Permission'
@@ -757,20 +630,6 @@ AND P.[NAMESPACE] IN
 )
 AND G.NAME = 'NNA.Apps.B2B.WellsFargoUser.Group'
 
-
 GO
-
-
-PRINT 'Added Trusted Notary Permissions association to NNA.Apps.IT.Eng.Staff.Group Group'  --CHID-3
-
---INSERT INTO [RBAC].[GROUPPERMISSION]
-SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
-CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
-LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
-WHERE GP.GROUPID IS NULL 
-AND G.NAME = 'NNA.Apps.IT.Eng.Staff.Group'
-
-Go
-
 PRINT '------------------------END-----------------------------------'
 
