@@ -1,32 +1,75 @@
 ﻿/*---------------------------------------------------------------------
 Created By:-	N Vamsi Rajesh
 Description:-	RBAC- Inserting Group Permission association
-Modified Date:-	2019-02-01
+Modified Date:-	2019-07-17
 Comments:-		Adding records in GROUPPERMISSION table based on the Groups associating with Permission .
 ---------------------------------------------------------------------*/
 
 Go
 
 /*------------------------------------------------------------------------------------
-Step 1. View Permission: - Adding view permissions for all groups.
-----------------------------------------------------------------------------------------*/
+Step 1. View Permission: - Adding view permissions for  below  groups.
 
+Excel Group									Database Group(Mapping database record)				Group ID
+----------------------------------------------------------------------------------------
+Customer Care & Hotline TQeam User			NNA.Apps.CustomerCare.Hotline.Head.Group			251
+											NNA.Apps.CustomerCare.Hotline.Staff.Group			267
+Digital Marketing Team User					NNA.Apps.Marketing.Digital.Head.Group				60
+											NNA.Apps.Marketing.Digital.Staff.Group				9
+Applications Team User						NNA.Apps.CustomerCare.Applications.Staff.Group		258
+											NNA.Apps.CustomerCare.Applications.Head.Group		271											
+Releasing Team User							NNA.Apps.CustomerCare.Releasing.Staff.Group			250
+											NNA.Apps.CustomerCare.Releasing.Head.Group			274
+Insurance Team User							NNA.Apps.CustomerCare.Insurance.Staff.Group			240
+											NNA.Apps.CustomerCare.Insurance.Head.Group			269
+Order Entry & Mail Room Team User			NNA.Apps.CustomerCare.OrderEntry&MailRoom.Staff.Group	246
+											NNA.Apps.CustomerCare.OrderEntry&MailRoom.Head.Group	247
+Resolution Team User						NNA.Apps.CustomerCare.Resolution.Staff.Group		244
+											NNA.Apps.CustomerCare.Resolution.Head.Group			260
+Operations Team User						NNA.Apps.Operations.Staff.Group						243
+											NNA.Apps.Operations.Head.Group						255
+Seminar Instructor & Live Scanr Team User	NNA.Apps.Seminar.Instructor&LiveScan.Head.Group		248
+											NNA.Apps.Seminar.Instructor&LiveScan.Staff.Group	270
+Seminar Operations Team User				NNA.Apps.Seminar.Operations.Head.Group				242
+											NNA.Apps.Seminar.Operations.Staff.Group				272
+-------------------------------------------------------------------------------------------*/----------------------------------------------------------------------------------------*/
 DECLARE @ViewPermission Varchar(100)='%.View'
 
-INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
-WHERE GP.GROUPID IS NULL AND 
+WHERE GP.GROUPID IS NULL 
+AND 
 (
-	P.[NAMESPACE] LIKE @ViewPermission 
+	 P.[NAMESPACE]  LIKE @ViewPermission
 )
-AND G.NAME LIKE 'NNA.Apps.%'
-
-GO
-
+AND G.NAME IN 
+(
+        'NNA.Apps.CustomerCare.Hotline.Head.Group', 
+		'NNA.Apps.CustomerCare.Hotline.Staff.Group',
+		'NNA.Apps.Marketing.Digital.Head.Group', 
+		'NNA.Apps.Marketing.Digital.Staff.Group',	
+		'NNA.Apps.CustomerCare.Applications.Staff.Group', 
+		'NNA.Apps.CustomerCare.Applications.Head.Group',
+		'NNA.Apps.CustomerCare.Releasing.Staff.Group', 
+		'NNA.Apps.CustomerCare.Releasing.Head.Group',
+		'NNA.Apps.CustomerCare.Insurance.Staff.Group', 
+		'NNA.Apps.CustomerCare.Insurance.Head.Group',
+		'NNA.Apps.CustomerCare.OrderEntry&MailRoom.Staff.Group', 
+		'NNA.Apps.CustomerCare.OrderEntry&MailRoom.Head.Group',
+		'NNA.Apps.CustomerCare.Resolution.Staff.Group', 
+		'NNA.Apps.CustomerCare.Resolution.Head.Group',
+		'NNA.Apps.Operations.Staff.Group', 
+		'NNA.Apps.Operations.Head.Group',
+		'NNA.Apps.Seminar.Instructor&LiveScan.Head.Group', 
+		'NNA.Apps.Seminar.Instructor&LiveScan.Staff.Group',
+		'NNA.Apps.Seminar.Operations.Head.Group', 
+		'NNA.Apps.Seminar.Operations.Staff.Group'
+ )
+ GO
+ 
 /*------------------------------------------------------------------------------------
-Step 2. Create, Edit and Delete Permissions: - Adding Create, Edit and Delete permissions for below groups
+Step 2. Create, Edit and Delete Permissions: - Adding Create, Edit and Delete and View permissions for below groups
 
 Excel Group							Database Group(Mapping database record)		Group ID
 ----------------------------------------------------------------------------------------
@@ -37,22 +80,20 @@ Application Dev & BATeam User		NNA.Apps.IT.Eng.Head.Group					71
 DECLARE @ViewPermission Varchar(100)='%.View', @CreatePermission Varchar(100)='%.Create'
 DECLARE @EditPermission Varchar(100)='%.Edit', @DeletePermission Varchar(100)='%.Delete'
 
-INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
 WHERE GP.GROUPID IS NULL 
 AND 
 (
-	(
+	
 		P.[NAMESPACE] LIKE @CreatePermission 
 		OR 
 		P.[NAMESPACE] LIKE @EditPermission
 		OR 
 		P.[NAMESPACE] LIKE @DeletePermission 
-	)
-	AND
-	P.[NAMESPACE] NOT LIKE @ViewPermission
+        OR
+	   P.[NAMESPACE]  LIKE @ViewPermission
 )
 AND G.NAME IN 
 (
@@ -63,7 +104,7 @@ AND G.NAME IN
 GO
 
 /*------------------------------------------------------------------------------------
-Step 3. Products and Offers:- Adding Create, Edit and Delete permissions for below groups
+Step 3. Products and Offers:- Adding Create, Edit and Delete and View permissions for below groups
 
 Excel Group							Database Group(Mapping database record)		Group ID
 ----------------------------------------------------------------------------------------
@@ -81,20 +122,18 @@ DECLARE @ProductsRole Varchar(100)='Products.%'
 DECLARE @OffersRole Varchar(100)='Offers.%'
 DECLARE @ViewPermission Varchar(100)='%.View'
 
-INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
 WHERE GP.GROUPID IS NULL 
 AND 
 (
-	(
+	
 		P.[NAMESPACE] LIKE @ProductsRole 
 		OR 
 		P.[NAMESPACE] LIKE @OffersRole
-	)
-	AND
-	P.[NAMESPACE] NOT LIKE @ViewPermission
+	    OR
+	    P.[NAMESPACE]  LIKE @ViewPermission
 )
 AND G.NAME IN 
 (
@@ -112,7 +151,7 @@ AND G.NAME IN
 GO
 
 /*------------------------------------------------------------------------------------
-Step 4. Offers Permission: - Adding offers permissions to below groups
+Step 4. Offers Permission: - Adding offers and View permissions to below groups
 
 Excel Group							Database Group(Mapping database record)		Group ID
 ----------------------------------------------------------------------------------------
@@ -128,15 +167,14 @@ Trusted Notary Leadership  User		NNA.Apps.TrustedNotary.Head.Group			252
 DECLARE @OffersRole Varchar(100)='Offers.%'
 DECLARE @ViewPermission Varchar(100)='%.View'
 
-INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
 WHERE GP.GROUPID IS NULL AND 
 (
 	P.[NAMESPACE] LIKE @OffersRole
-	AND 
-	P.[NAMESPACE] NOT LIKE @ViewPermission
+	or
+	P.[NAMESPACE]  LIKE @ViewPermission
 )
 AND G.NAME IN 
 (
@@ -193,7 +231,6 @@ DECLARE @AdminNotariesEdit Varchar(100)='Admin.Notaries.Edit'
 DECLARE @AdminOrdersCreate Varchar(100)='Admin.Orders.Create'
 DECLARE @AdminOrdersEdit Varchar(100)='Admin.Orders.Edit'
 
-INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
@@ -207,6 +244,7 @@ WHERE GP.GROUPID IS NULL AND
 		P.[NAMESPACE] LIKE @AdminNotariesEdit
 		OR 
 		P.[NAMESPACE] LIKE @AdminOrdersEdit
+		
 	)
 )
 AND G.NAME IN 
@@ -246,7 +284,7 @@ AND G.NAME IN
 GO
 
 /*----------------------------------------------------------------------------------------
-Step 6.Admin Permission: - Create organization , Create partners, Edit organization and Edit partners.
+Step 6.Admin Permission: - Create organization , Create partners, Edit organization and Edit partners and View Permissions
 
 Excel Group									Database Group(Mapping database record)				Group ID
 ----------------------------------------------------------------------------------------
@@ -265,7 +303,6 @@ DECLARE @AdminOrganizations Varchar(100)='Admin.Organizations.%',@AdminPartners 
 DECLARE @ViewPermission Varchar(100)='%.View', @DeletePermission Varchar(100)='%.Delete'
 
 
-INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
@@ -275,8 +312,10 @@ WHERE GP.GROUPID IS NULL AND
 		P.[NAMESPACE] LIKE @AdminOrganizations
 		OR 
 		P.[NAMESPACE] LIKE @AdminPartners
+		OR 
+		P.[NAMESPACE]  LIKE @ViewPermission
 	)
-	AND P.[NAMESPACE] NOT LIKE @ViewPermission
+	
 	AND P.[NAMESPACE] NOT LIKE @DeletePermission	
 )
 AND G.NAME IN 
@@ -308,13 +347,14 @@ Trusted Notary Leadership  User				NNA.Apps.TrustedNotary.Head.Group					252
 
 DECLARE @AdminOrganizationsDelete Varchar(100)='Admin.Organizations.Delete'
 
-INSERT INTO [RBAC].[GROUPPERMISSION]
+
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
 WHERE GP.GROUPID IS NULL AND 
 (
 	P.[NAMESPACE]=@AdminOrganizationsDelete
+	
 )
 AND G.NAME IN 
 (	
@@ -344,7 +384,6 @@ Trusted Notary Team User					NNA.Apps.TrustedNotary.Staff.Group					261
 DECLARE @AdminNotariesDelete Varchar(100)='Admin.Notaries.Delete'
 DECLARE @AdminOrdersDelete Varchar(100)='Admin.Orders.Delete'
 
-INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
