@@ -1,539 +1,369 @@
 ﻿/*---------------------------------------------------------------------
-CREATED BY: -		N Vamsi Rajesh
-DESCRIPTION: -		Migrating non Office 365 OAuthAccount Claims To Groups.
-MODIFIED DATE: -	2019-06-25
-COMMENTS: -			Regarding PLAT-2862, Consolidated script for migrating OAuthAccount Claims to Groups.
-						STEP-1: - Create new Groups for OAuthAccount						
-						STEP-2: - OAuthAccount associate to Groups
-						STEP-3: - Create new Trusted Notary Permission
-						STEP-4: - Added Trusted Notary Permissions association to Operation
-						STEP-5: - Added Trusted Notary Permissions association to Groups.
-						STEP-6: - Associate azu.renna user to NNA.Apps.IT.Eng.Staff.Group Group.
-										
-CHID	Name            Date              Description                        
-----	----------      ---------------   ------------                          
-1		Vamsi Rajesh    2019-05-10		  Created
-2		Vamsi Rajesh	2019-06-13		  Modified script for not associated users With Patner and added except condition for 'Welsfargo' and 'Punchout' claims.
-3		Vamsi Rajesh	2019-06-25		  Modified script for associating rbac group for missing Customer, Welsfargo and Punchout claims.
+Created By:-	N Vamsi Rajesh
+Description:-	RBAC- Inserting Group Permission association
+Modified Date:-	2019-02-01
+Comments:-		Adding records in GROUPPERMISSION table based on the Groups associating with Permission .
 ---------------------------------------------------------------------*/
 
-PRINT 'STEP-1: - Create new Groups for OAuthAccount'
-PRINT 'START'
-GO
-
-DECLARE @GroupName VARCHAR(200)='NNA.Apps.B2B.Administrator.Group'
-IF NOT EXISTS (SELECT 1 FROM [rbac].[Group] (NOLOCK) WHERE [Name] = @GroupName)
-BEGIN
-	INSERT INTO [rbac].[Group] ([IssuerId], [ObjectId], [Name],[Mail],[Description],[CreatedAtUtc]) 
-	SELECT 1 [IssuerId],null [ObjectId],@GroupName [Name],Null [Mail],NULL [Description],GETUTCDATE() [CreatedAtUtc]	
-END
-
 Go
 
-DECLARE @GroupName VARCHAR(200)='NNA.Apps.B2B.NotaryUser.Group'
-IF NOT EXISTS (SELECT 1 FROM [rbac].[Group] (NOLOCK) WHERE [Name] = @GroupName)
-BEGIN
-	INSERT INTO [rbac].[Group] ([IssuerId], [ObjectId], [Name],[Mail],[Description],[CreatedAtUtc]) 
-	SELECT 1 [IssuerId],null [ObjectId],@GroupName [Name],Null [Mail],NULL [Description],GETUTCDATE() [CreatedAtUtc]
-END
+/*------------------------------------------------------------------------------------
+Step 1. View Permission: - Adding view permissions for all groups.
+----------------------------------------------------------------------------------------*/
 
-Go
+DECLARE @ViewPermission Varchar(100)='%.View'
 
-DECLARE @GroupName VARCHAR(200)='NNA.Apps.B2B.NotaryUserWithOrderCred.Group'
-IF NOT EXISTS (SELECT 1 FROM [rbac].[Group] (NOLOCK) WHERE [Name] = @GroupName)
-BEGIN
-	INSERT INTO [rbac].[Group] ([IssuerId], [ObjectId], [Name],[Mail],[Description],[CreatedAtUtc]) 
-	SELECT 1 [IssuerId],null [ObjectId],@GroupName [Name],Null [Mail],NULL [Description],GETUTCDATE() [CreatedAtUtc]
-END
-
-Go
-
-DECLARE @GroupName VARCHAR(200)='NNA.Apps.B2B.PunchoutUser.Group'
-
-IF NOT EXISTS (SELECT 1 FROM [rbac].[Group] (NOLOCK) WHERE [Name] = @GroupName)
-BEGIN
-	INSERT INTO [rbac].[Group] ([IssuerId], [ObjectId], [Name],[Mail],[Description],[CreatedAtUtc]) 
-	SELECT 1 [IssuerId],null [ObjectId],@GroupName [Name],Null [Mail],NULL [Description],GETUTCDATE() [CreatedAtUtc]
-END
-
-Go
-
-DECLARE @GroupName VARCHAR(200)='NNA.Apps.B2B.WellsFargoUser.Group'
-
-IF NOT EXISTS (SELECT 1 FROM [rbac].[Group] (NOLOCK) WHERE [Name] = @GroupName)
-BEGIN
-	INSERT INTO [rbac].[Group] ([IssuerId], [ObjectId], [Name],[Mail],[Description],[CreatedAtUtc]) 
-	SELECT 1 [IssuerId],null [ObjectId],@GroupName [Name],Null [Mail],NULL [Description],GETUTCDATE() [CreatedAtUtc]
-END
-
-GO
-PRINT '------------------------END-----------------------------------'
-
-PRINT 'STEP-2: - OAuthAccount associate to Groups'
-PRINT 'START'
-
-Go
-
-PRINT 'Associate Administrator users to Group'
-
-DECLARE @GroupName VARCHAR(100)='NNA.Apps.B2B.Administrator.Group'
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
+INSERT INTO [RBAC].[GROUPPERMISSION]
+SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
+CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
+LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
+WHERE GP.GROUPID IS NULL AND 
 (
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Administrator'
-    	
-	EXCEPT 
-
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='WellsFargo' --CHID-2
-
-	EXCEPT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='PunchOut' --CHID-2
-		
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1 
+	P.[NAMESPACE] LIKE @ViewPermission 
+)
+AND G.NAME LIKE 'NNA.Apps.%'
 
 GO
 
-PRINT 'Associate Users to Group'
-
-DECLARE @GroupName VARCHAR(100)='NNA.Apps.B2B.NotaryUser.Group'
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
-(
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='User'
-
-	EXCEPT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Administrator'
-  		
-	EXCEPT 
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='NNA.Orders.Place'
-
-	EXCEPT
-
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK) --CHID-2
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='WellsFargo'
-
-	EXCEPT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK) --CHID-2
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='PunchOut'
-		
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1 
-
-PRINT 'Associate Customer users to Group' --CHID-3
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
-(
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Customer'
-
-	EXCEPT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Administrator'
-  		
-	EXCEPT 
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='NNA.Orders.Place'
-
-	EXCEPT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='User'
-
-	EXCEPT
-
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK) --CHID-2
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='WellsFargo'
-
-	EXCEPT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK) --CHID-2
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='PunchOut'
-		
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1 
-
-GO
-
-PRINT 'Associate NNA.Orders.Place users to Group'
-
-DECLARE @GroupName VARCHAR(100)='NNA.Apps.B2B.NotaryUserWithOrderCred.Group'
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
-(
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='NNA.Orders.Place'
-
-	EXCEPT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Administrator'
-   		
-	EXCEPT 
-
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK) --CHID-2
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='WellsFargo'
-
-	EXCEPT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK) --CHID-2
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='PunchOut'
-		
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1 
-
-
-GO
-
-PRINT 'Associate PunchOut users to Group'
-
-DECLARE @GroupName VARCHAR(100)='NNA.Apps.B2B.PunchoutUser.Group'
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
-(
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='User'
-
-    INTERSECT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Customer'	
-
-	INTERSECT 
-
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='PunchOut'
-		
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1
-
-Go
-
-PRINT 'Associate WellsFargo users to Group'
-
-DECLARE @GroupName VARCHAR(100)='NNA.Apps.B2B.WellsFargoUser.Group'
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
-(
-
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='User'
-
-    INTERSECT
-
-	SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Customer'	
-
-	INTERSECT 
-
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='WellsFargo'		
-		
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID >1 
-
-GO
-PRINT '------------------------END-----------------------------------'
-
-PRINT 'STEP-3: - Create new Trusted Notary Permission'
-PRINT 'START'
-
-Go
-
-INSERT INTO [rbac].[Permission] (IssuerId, [Namespace], CreatedAtUtc)
-SELECT [TNPermission].IssuerId, [TNPermission].[Namespace], GETUTCDATE() CreatedAtUtc FROM 
-(
-
-	SELECT 	1 IssuerId,'User.Profile.Edit' [Namespace] UNION
-	SELECT 	1,'Organization.Notaries.View' UNION
-	SELECT 	1,'Organization.Orders.View' UNION
-	SELECT 	1,'Organization.NotaryOrders.Create' UNION
-	SELECT 	1,'Organization.Notaries.Create' UNION
-	SELECT 	1,'User.ResetPassword.Edit' UNION
-	SELECT 	1,'User.ForgotPassword.Edit' UNION
-	SELECT 	1,'Organization.Notaries.Download' UNION
-	SELECT 	1,'Organization.Notaries.Edit' UNION
-	SELECT 	1,'Organization.Notaries.Delete'
-
-) [TNPermission]
-LEFT JOIN [RBAC].[Permission] p on p.[Namespace] = [TNPermission].[Namespace]
-WHERE P.[Namespace] IS NULL
-
-GO
-PRINT '------------------------END-----------------------------------'
-
-PRINT 'STEP-4: - Added Trusted Notary Permissions association to Operation'
-PRINT 'START'
-
-Go
-					
-
-INSERT INTO [rbac].[PermissionOperation] ([PermissionId], [OperationId])
-SELECT DISTINCT [NewPO].PermissionId, [NewPO].OperationId  FROM 
-(
-
-	SELECT 	P. Id 'PermissionId', O.Id 'OperationId' FROM [RBAC].[Permission] p INNER JOIN [RBAC].[Operation] O On O.[Resource]='NNA.Services.Profiles.Controllers.NotariesController' 
-	WHERE P.[Namespace]='User.Profile.Edit' AND O.[Action]='Update'
-	UNION
-
-	SELECT 	P. Id , O.Id FROM [RBAC].[Permission] p INNER JOIN [RBAC].[Operation] O On O.[Resource]='NNA.Services.Orders.Controllers.OrdersController' 
-	WHERE P.[Namespace]='Organization.Notaries.View' AND O.[Action]='GetOrdersByOrganization'
-	UNION
-
-	SELECT 	P. Id , O.Id FROM [RBAC].[Permission] p INNER JOIN [RBAC].[Operation] O On O.[Resource]='NNA.Services.Orders.Controllers.OrdersController' 
-	WHERE P.[Namespace]='Organization.Orders.View' AND O.[Action]='Get'
-	UNION
-
-	SELECT 	P. Id , O.Id FROM [RBAC].[Permission] p INNER JOIN [RBAC].[Operation] O On O.[Resource]='NNA.Services.Orders.Controllers.OrdersController' 
-	WHERE P.[Namespace]='Organization.NotaryOrders.Create' AND O.[Action]='Place'
-	UNION
-
-	SELECT 	P. Id , O.Id FROM [RBAC].[Permission] p INNER JOIN [RBAC].[Operation] O On O.[Resource]='NNA.Services.Identity.Controllers.UserInvitationsController' 
-	WHERE P.[Namespace]='Organization.Notaries.Create' AND O.[Action]='Add'
-	UNION
-
-	SELECT 	P. Id , O.Id FROM [RBAC].[Permission] p INNER JOIN [RBAC].[Operation] O On O.[Resource]='NNA.Services.Identity.Controllers.PasswordsController' 
-	WHERE P.[Namespace]='User.ResetPassword.Edit' AND O.[Action]='Update'
-	UNION
-
-	SELECT 	P. Id , O.Id FROM [RBAC].[Permission] p INNER JOIN [RBAC].[Operation] O On O.[Resource]='NNA.Services.Identity.Controllers.PasscodesController' 
-	WHERE P.[Namespace]='User.ForgotPassword.Edit' AND O.[Action]='RequestCode'
-	UNION
-
-	SELECT 	P. Id , O.Id FROM [RBAC].[Permission] p INNER JOIN [RBAC].[Operation] O On O.[Resource]='NNA.Services.Profiles.Controllers.PartnersController' 
-	WHERE P.[Namespace]='Organization.Notaries.Download' AND O.[Action]='InstantNotaryDownload'
-	UNION
-
-	SELECT 	P. Id , O.Id FROM [RBAC].[Permission] p INNER JOIN [RBAC].[Operation] O On O.[Resource]='NNA.Services.Profiles.Controllers.NotariesController' 
-	WHERE P.[Namespace]='Organization.Notaries.Edit' AND O.[Action]='Update'
-	UNION
-
-	SELECT 	P. Id , O.Id FROM [RBAC].[Permission] p INNER JOIN [RBAC].[Operation] O On O.[Resource]='NNA.Services.Profiles.Controllers.OrganizationsController' 
-	WHERE P.[Namespace]='Organization.Notaries.Delete' AND O.[Action]='RemoveNotary'
-
-) [NewPO]
-LEFT JOIN [rbac].[PermissionOperation] po on po.[PermissionId] = [NewPO].[PermissionId] AND po.[OperationId] = [NewPO].[OperationId]
-WHERE po.[PermissionId] IS NULL
-
-GO
-PRINT '------------------------END-----------------------------------'
-
-PRINT 'STEP-5: - Added Trusted Notary Permissions association to Groups.'
-PRINT 'START'
-
-Go
+/*------------------------------------------------------------------------------------
+Step 2. Create, Edit and Delete Permissions: - Adding Create, Edit and Delete permissions for below groups
+
+Excel Group							Database Group(Mapping database record)		Group ID
+----------------------------------------------------------------------------------------
+Application Dev & BATeam User		NNA.Apps.IT.Eng.Head.Group					71
+									NNA.Apps.IT.Eng.Staff.Group					2
+----------------------------------------------------------------------------------------*/
+
+DECLARE @ViewPermission Varchar(100)='%.View', @CreatePermission Varchar(100)='%.Create'
+DECLARE @EditPermission Varchar(100)='%.Edit', @DeletePermission Varchar(100)='%.Delete'
 
 INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
 WHERE GP.GROUPID IS NULL 
-AND P.[NAMESPACE] IN
+AND 
 (
-	'Offers.Packages.View',
-	'Offers.Catalogs.View',
-	'Admin.Orders.Create',
-	'Admin.Notaries.Create',
-	'Organization.Notaries.Download',
-	'Organization.Notaries.View',
-	'Organization.Notaries.Create',
-	'Organization.Notaries.Delete',
-	'Organization.Notaries.Edit',
-	'Organization.NotaryOrders.Create',
-	'Organization.Orders.View',
-	'User.ForgotPassword.Edit',
-	'User.Profile.Edit',
-	'User.ResetPassword.Edit'
+	(
+		P.[NAMESPACE] LIKE @CreatePermission 
+		OR 
+		P.[NAMESPACE] LIKE @EditPermission
+		OR 
+		P.[NAMESPACE] LIKE @DeletePermission 
+	)
+	AND
+	P.[NAMESPACE] NOT LIKE @ViewPermission
 )
-AND G.NAME = 'NNA.Apps.B2B.Administrator.Group'
+AND G.NAME IN 
+(
+	'NNA.Apps.IT.Eng.Head.Group',
+	'NNA.Apps.IT.Eng.Staff.Group'
+)
 
-Go
+GO
+
+/*------------------------------------------------------------------------------------
+Step 3. Products and Offers:- Adding Create, Edit and Delete permissions for below groups
+
+Excel Group							Database Group(Mapping database record)		Group ID
+----------------------------------------------------------------------------------------
+Product Management Team User		NNA.Apps.Marketing.Products.Staff.Group		43
+									NNA.Apps.Marketing.Products.Head.Group		161
+									NNA.Apps.Marketing.Admin.Admin.Group		209
+									NNA.Apps.Admin.Group						230
+									NNA.Apps.IT.Admin.Admin.Group				231
+									NNA.Apps.IT.DevOps.Staff.Group				233
+									NNA.Apps.IT.IS.Head.Group					234
+									NNA.Apps.IT.DevOps.Head.Group				235
+									NNA.Apps.IT.IS.Staff.Group					236
+----------------------------------------------------------------------------------------*/
+DECLARE @ProductsRole Varchar(100)='Products.%'
+DECLARE @OffersRole Varchar(100)='Offers.%'
+DECLARE @ViewPermission Varchar(100)='%.View'
 
 INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
 WHERE GP.GROUPID IS NULL 
-AND P.[NAMESPACE] IN
+AND 
 (
-	'User.ForgotPassword.Edit',
-	'User.Profile.Edit',
-	'User.ResetPassword.Edit'
+	(
+		P.[NAMESPACE] LIKE @ProductsRole 
+		OR 
+		P.[NAMESPACE] LIKE @OffersRole
+	)
+	AND
+	P.[NAMESPACE] NOT LIKE @ViewPermission
 )
-AND G.NAME = 'NNA.Apps.B2B.NotaryUser.Group'
+AND G.NAME IN 
+(
+	'NNA.Apps.Marketing.Products.Head.Group',
+	'NNA.Apps.Marketing.Products.Staff.Group',
+	'NNA.Apps.Marketing.Admin.Admin.Group',
+	'NNA.Apps.Admin.Group',
+	'NNA.Apps.IT.Admin.Admin.Group',
+	'NNA.Apps.IT.IS.Head.Group',
+	'NNA.Apps.IT.IS.Staff.Group',
+	'NNA.Apps.IT.DevOps.Head.Group',
+	'NNA.Apps.IT.DevOps.Staff.Group'
+)
 
-Go
+GO
+
+/*------------------------------------------------------------------------------------
+Step 4. Offers Permission: - Adding offers permissions to below groups
+
+Excel Group							Database Group(Mapping database record)		Group ID
+----------------------------------------------------------------------------------------
+Marketing Team User					NNA.Apps.Marketing.Team.Head.Group			257
+									NNA.Apps.Marketing.Team.Staff.Group			266
+Marketing Analyst User				NNA.Apps.Marketing.Analyst.Staff.Group		241
+									NNA.Apps.Marketing.Analyst.Head.Group		262
+Business Development Team User		NNA.Apps.BusinessDevelopment.Head.Group		238
+									NNA.Apps.BusinessDevelopment.Staff.Group	263
+Trusted Notary Leadership  User		NNA.Apps.TrustedNotary.Head.Group			252
+----------------------------------------------------------------------------------------*/
+
+DECLARE @OffersRole Varchar(100)='Offers.%'
+DECLARE @ViewPermission Varchar(100)='%.View'
 
 INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
-WHERE GP.GROUPID IS NULL 
-AND P.[NAMESPACE] IN
+WHERE GP.GROUPID IS NULL AND 
 (
-	'Offers.Packages.View',
-	'Offers.Catalogs.View',
-	'Admin.Orders.Create',
-	'User.ForgotPassword.Edit',
-	'User.Profile.Edit',
-	'User.ResetPassword.Edit'
+	P.[NAMESPACE] LIKE @OffersRole
+	AND 
+	P.[NAMESPACE] NOT LIKE @ViewPermission
 )
-AND G.NAME = 'NNA.Apps.B2B.NotaryUserWithOrderCred.Group'
+AND G.NAME IN 
+(
+	'NNA.Apps.Marketing.Team.Head.Group',
+	'NNA.Apps.Marketing.Team.Staff.Group',
+	'NNA.Apps.Marketing.Analyst.Staff.Group',
+	'NNA.Apps.Marketing.Analyst.Head.Group',
+	'NNA.Apps.BusinessDevelopment.Head.Group',
+	'NNA.Apps.BusinessDevelopment.Staff.Group',
+	'NNA.Apps.TrustedNotary.Head.Group'
+)
 
 GO
+
+/*----------------------------------------------------------------------------------------
+Step 5. Admin Permission: - Create notaries, Create orders, Edit notaries and  Edit orders.
+
+Excel Group									Database Group(Mapping database record)				Group ID
+----------------------------------------------------------------------------------------
+Customer Care & Hotline TQeam User			NNA.Apps.CustomerCare.Hotline.Head.Group			251
+											NNA.Apps.CustomerCare.Hotline.Staff.Group			267
+Customer Care Leadership  User				NNA.Apps.CustomerCare.CallCenter.Head.Group			256
+											NNA.Apps.CustomerCare.CallCenter.Staff.Group		275
+Finance Team User							NNA.Apps.Finance.Head.Group							249
+											NNA.Apps.Finance.Staff.Group						273
+Digital Marketing Team User					NNA.Apps.Marketing.Digital.Head.Group				60
+											NNA.Apps.Marketing.Digital.Staff.Group				9
+Marketing Analyst User						NNA.Apps.Marketing.Analyst.Staff.Group				241
+											NNA.Apps.Marketing.Analyst.Head.Group				262
+Applications Team User						NNA.Apps.CustomerCare.Applications.Staff.Group		258
+											NNA.Apps.CustomerCare.Applications.Head.Group		271											
+Releasing Team User							NNA.Apps.CustomerCare.Releasing.Staff.Group			250
+											NNA.Apps.CustomerCare.Releasing.Head.Group			274
+Insurance Team User							NNA.Apps.CustomerCare.Insurance.Staff.Group			240
+											NNA.Apps.CustomerCare.Insurance.Head.Group			269
+Order Entry & Mail Room Team User			NNA.Apps.CustomerCare.OrderEntry&MailRoom.Staff.Group	246
+											NNA.Apps.CustomerCare.OrderEntry&MailRoom.Head.Group	247
+Resolution Team User						NNA.Apps.CustomerCare.Resolution.Staff.Group		244
+											NNA.Apps.CustomerCare.Resolution.Head.Group			260
+Operations Team User						NNA.Apps.Operations.Staff.Group						243
+											NNA.Apps.Operations.Head.Group						255
+Seminar Instructor & Live Scanr Team User	NNA.Apps.Seminar.Instructor&LiveScan.Head.Group		248
+											NNA.Apps.Seminar.Instructor&LiveScan.Staff.Group	270
+Seminar Operations Team User				NNA.Apps.Seminar.Operations.Head.Group				242
+											NNA.Apps.Seminar.Operations.Staff.Group				272
+Business Development Team User				NNA.Apps.BusinessDevelopment.Head.Group				238
+											NNA.Apps.BusinessDevelopment.Staff.Group			263
+Trusted Notary Leadership  User				NNA.Apps.TrustedNotary.Head.Group					252
+Trusted Notary Team User					NNA.Apps.TrustedNotary.Staff.Group					261
+-------------------------------------------------------------------------------------------*/
+
+DECLARE @AdminNotariesCreate Varchar(100)='Admin.Notaries.Create'
+DECLARE @AdminNotariesEdit Varchar(100)='Admin.Notaries.Edit'
+DECLARE @AdminOrdersCreate Varchar(100)='Admin.Orders.Create'
+DECLARE @AdminOrdersEdit Varchar(100)='Admin.Orders.Edit'
 
 INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
-WHERE GP.GROUPID IS NULL 
-AND P.[NAMESPACE] IN
+WHERE GP.GROUPID IS NULL AND 
 (
-	'Offers.Packages.View',
-	'Offers.Catalogs.View',
-	'Admin.Orders.Create',	
-	'User.Profile.Edit',
-	'Organization.Notaries.View',
-	'Admin.Notaries.Create',	
-	'Organization.NotaryOrders.Create',
-	'Organization.Notaries.Edit',
-	'Organization.Notaries.Delete'
+	(
+		P.[NAMESPACE] LIKE @AdminNotariesCreate
+		OR 
+		P.[NAMESPACE] LIKE @AdminOrdersCreate
+		OR 
+		P.[NAMESPACE] LIKE @AdminNotariesEdit
+		OR 
+		P.[NAMESPACE] LIKE @AdminOrdersEdit
+	)
 )
-AND G.NAME = 'NNA.Apps.B2B.PunchoutUser.Group'
+AND G.NAME IN 
+(
+		'NNA.Apps.CustomerCare.Hotline.Head.Group', 
+		'NNA.Apps.CustomerCare.Hotline.Staff.Group',
+		'NNA.Apps.CustomerCare.CallCenter.Head.Group', 
+		'NNA.Apps.CustomerCare.CallCenter.Staff.Group',
+		'NNA.Apps.Finance.Head.Group', 
+		'NNA.Apps.Finance.Staff.Group',
+		'NNA.Apps.Marketing.Digital.Head.Group', 
+		'NNA.Apps.Marketing.Digital.Staff.Group',	
+		'NNA.Apps.Marketing.Analyst.Staff.Group', 
+		'NNA.Apps.Marketing.Analyst.Head.Group',
+		'NNA.Apps.CustomerCare.Applications.Staff.Group', 
+		'NNA.Apps.CustomerCare.Applications.Head.Group',
+		'NNA.Apps.CustomerCare.Releasing.Staff.Group', 
+		'NNA.Apps.CustomerCare.Releasing.Head.Group',
+		'NNA.Apps.CustomerCare.Insurance.Staff.Group', 
+		'NNA.Apps.CustomerCare.Insurance.Head.Group',
+		'NNA.Apps.CustomerCare.OrderEntry&MailRoom.Staff.Group', 
+		'NNA.Apps.CustomerCare.OrderEntry&MailRoom.Head.Group',
+		'NNA.Apps.CustomerCare.Resolution.Staff.Group', 
+		'NNA.Apps.CustomerCare.Resolution.Head.Group',
+		'NNA.Apps.Operations.Staff.Group', 
+		'NNA.Apps.Operations.Head.Group',
+		'NNA.Apps.Seminar.Instructor&LiveScan.Head.Group', 
+		'NNA.Apps.Seminar.Instructor&LiveScan.Staff.Group',
+		'NNA.Apps.Seminar.Operations.Head.Group', 
+		'NNA.Apps.Seminar.Operations.Staff.Group',
+		'NNA.Apps.BusinessDevelopment.Head.Group', 
+		'NNA.Apps.BusinessDevelopment.Staff.Group',
+		'NNA.Apps.TrustedNotary.Head.Group', 
+		'NNA.Apps.TrustedNotary.Staff.Group'		
+)
 
-Go
+GO
+
+/*----------------------------------------------------------------------------------------
+Step 6.Admin Permission: - Create organization , Create partners, Edit organization and Edit partners.
+
+Excel Group									Database Group(Mapping database record)				Group ID
+----------------------------------------------------------------------------------------
+Customer Care Leadership  User				NNA.Apps.CustomerCare.CallCenter.Head.Group			256
+											NNA.Apps.CustomerCare.CallCenter.Staff.Group		275
+Executive Management Team User				NNA.Apps.ExecutiveManagement.Staff.Group			245
+											NNA.Apps.ExecutiveManagement.Head.Group				259
+Finance Team User							NNA.Apps.Finance.Head.Group							249
+											NNA.Apps.Finance.Staff.Group						273
+Business Development Team User				NNA.Apps.BusinessDevelopment.Head.Group				238
+											NNA.Apps.BusinessDevelopment.Staff.Group			263
+Trusted Notary Leadership  User				NNA.Apps.TrustedNotary.Head.Group					252
+----------------------------------------------------------------------------------------*/
+
+DECLARE @AdminOrganizations Varchar(100)='Admin.Organizations.%',@AdminPartners Varchar(100)='Admin.Partners.%'
+DECLARE @ViewPermission Varchar(100)='%.View', @DeletePermission Varchar(100)='%.Delete'
+
 
 INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
-WHERE GP.GROUPID IS NULL 
-AND P.[NAMESPACE] IN
+WHERE GP.GROUPID IS NULL AND 
 (
-	'Offers.Packages.View',
-	'Offers.Catalogs.View',
-	'Admin.Orders.Create',	
-	'User.Profile.Edit'
+	(
+		P.[NAMESPACE] LIKE @AdminOrganizations
+		OR 
+		P.[NAMESPACE] LIKE @AdminPartners
+	)
+	AND P.[NAMESPACE] NOT LIKE @ViewPermission
+	AND P.[NAMESPACE] NOT LIKE @DeletePermission	
 )
-AND G.NAME = 'NNA.Apps.B2B.WellsFargoUser.Group'
-
-GO
-PRINT '------------------------END-----------------------------------'
-
-
-PRINT 'STEP-6: - Associate azu.renna user to NNA.Apps.IT.Eng.Staff.Group Group' 
-PRINT 'START'
-GO
-
-DECLARE @GroupName VARCHAR(100)='NNA.Apps.IT.Eng.Staff.Group'--CHID-3
-
-INSERT INTO [rbac].[OAuthAccountGroup] ([OAuthAccountId], [GroupId])
-SELECT OAA.OAuthAccountId,G.Id 
-FROM [idm].[USER] U (NOLOCK)
-INNER JOIN [idm].[OAuthAccount] OAA (NOLOCK) ON U.UserGUID = OAA.UserID
-INNER JOIN 
+AND G.NAME IN 
 (
-    SELECT DISTINCT SubjectGUID FROM [idm].SubjectClaim s (NOLOCK)
-	INNER JOIN [idm].[Claim] c (NOLOCK) ON s.ClaimId = c.ClaimId
-	WHERE c.ClaimValue='Administrator'   
-		
-) migrationClaims ON migrationClaims.SubjectGUID = OAA.OAuthAccountGUID
-INNER JOIN [nna].[Person] PE (NOLOCK) ON PE.PersonGUID = OAA.SubjectGUID
-INNER JOIN [idm].[Organization] O (NOLOCK) ON OAA.OrganizationID = O.OrganizationID
-INNER JOIN [nna].[Partner] P (NOLOCK) ON O.OrganizationID = P.PartnerOrganizationID
-INNER JOIN [rbac].[Group] G (NOLOCK) ON G.[Name] = @GroupName
-LEFT JOIN [rbac].[OAuthAccountGroup] OG (NOLOCK) ON OAA.OAuthAccountId = OG.OAuthAccountID
-WHERE OG.OAuthAccountId IS NULL AND O.OrganizationID = 1 AND U.UserName = 'azu.renna'
+	'NNA.Apps.CustomerCare.CallCenter.Head.Group',
+	'NNA.Apps.CustomerCare.CallCenter.Staff.Group',
+	'NNA.Apps.ExecutiveManagement.Staff.Group', 
+	'NNA.Apps.ExecutiveManagement.Head.Group',
+	'NNA.Apps.ExecutiveManagement.Staff.Group', 
+	'NNA.Apps.ExecutiveManagement.Head.Group',
+	'NNA.Apps.Finance.Head.Group', 
+	'NNA.Apps.Finance.Staff.Group',
+	'NNA.Apps.BusinessDevelopment.Head.Group', 
+	'NNA.Apps.BusinessDevelopment.Staff.Group',
+	'NNA.Apps.TrustedNotary.Head.Group'
+)
 
 GO
-PRINT '------------------------END-----------------------------------'
+
+/*------------------------------------------------------------------------------------------
+Step 7.Admin Permission: - Admin.Delete.Organizations - Delete (inactivate) organizations
+
+Excel Group									Database Group(Mapping database record)				Group ID
+----------------------------------------------------------------------------------------
+Business Development Team User				NNA.Apps.BusinessDevelopment.Head.Group				238
+											NNA.Apps.BusinessDevelopment.Staff.Group			263
+Trusted Notary Leadership  User				NNA.Apps.TrustedNotary.Head.Group					252
+----------------------------------------------------------------------------------------*/
+
+DECLARE @AdminOrganizationsDelete Varchar(100)='Admin.Organizations.Delete'
+
+INSERT INTO [RBAC].[GROUPPERMISSION]
+SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
+CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
+LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
+WHERE GP.GROUPID IS NULL AND 
+(
+	P.[NAMESPACE]=@AdminOrganizationsDelete
+)
+AND G.NAME IN 
+(	
+	'NNA.Apps.BusinessDevelopment.Head.Group', 
+	'NNA.Apps.BusinessDevelopment.Staff.Group',
+	'NNA.Apps.TrustedNotary.Head.Group'
+)
+
+
+GO
+
+/*----------------------------------------------------------------------------------------
+Step 8.Admin Permission: - Admin.Delete.Notaries - Delete (inactivate) notaries, Admin.Delete.Orders - Delete (inactivate) orders
+
+Excel Group									Database Group(Mapping database record)				Group ID
+----------------------------------------------------------------------------------------
+Customer Care Leadership  User				NNA.Apps.CustomerCare.CallCenter.Head.Group			256
+											NNA.Apps.CustomerCare.CallCenter.Staff.Group		275
+Resolution Team User						NNA.Apps.CustomerCare.Resolution.Staff.Group		244
+											NNA.Apps.CustomerCare.Resolution.Head.Group			260
+Business Development Team User				NNA.Apps.BusinessDevelopment.Head.Group				238
+											NNA.Apps.BusinessDevelopment.Staff.Group			263
+Trusted Notary Leadership  User				NNA.Apps.TrustedNotary.Head.Group					252
+Trusted Notary Team User					NNA.Apps.TrustedNotary.Staff.Group					261
+----------------------------------------------------------------------------------------*/
+
+DECLARE @AdminNotariesDelete Varchar(100)='Admin.Notaries.Delete'
+DECLARE @AdminOrdersDelete Varchar(100)='Admin.Orders.Delete'
+
+INSERT INTO [RBAC].[GROUPPERMISSION]
+SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
+CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
+LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
+WHERE GP.GROUPID IS NULL AND 
+(
+	P.[NAMESPACE]=@AdminNotariesDelete
+	OR
+	P.[NAMESPACE]=@AdminOrdersDelete
+)
+AND G.NAME IN 
+(
+	'NNA.Apps.CustomerCare.CallCenter.Head.Group',
+	'NNA.Apps.CustomerCare.CallCenter.Staff.Group',
+	'NNA.Apps.CustomerCare.Resolution.Staff.Group',
+	'NNA.Apps.CustomerCare.Resolution.Head.Group',
+	'NNA.Apps.BusinessDevelopment.Head.Group', 
+	'NNA.Apps.BusinessDevelopment.Staff.Group',
+	'NNA.Apps.TrustedNotary.Head.Group', 
+	'NNA.Apps.TrustedNotary.Staff.Group'		
+)
+
+GO
