@@ -1,7 +1,7 @@
 ﻿/*---------------------------------------------------------------------
 Created By:-	N Vamsi Rajesh
 Description:-	RBAC- Inserting Group Permission association
-Modified Date:-	2019-07-17
+Modified Date:-	2019-07-20
 Comments:-		Adding records in GROUPPERMISSION table based on the Groups associating with Permission .
 ---------------------------------------------------------------------*/
 
@@ -38,38 +38,25 @@ DECLARE @ViewPermission Varchar(100)='%.View'
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
-WHERE GP.GROUPID IS NULL 
-AND 
+WHERE GP.GROUPID IS NULL AND 
 (
-	 P.[NAMESPACE]  LIKE @ViewPermission
+	P.[NAMESPACE] LIKE @ViewPermission 
 )
-AND G.NAME IN 
+AND
 (
-        'NNA.Apps.CustomerCare.Hotline.Head.Group', 
-		'NNA.Apps.CustomerCare.Hotline.Staff.Group',
-		'NNA.Apps.Marketing.Digital.Head.Group', 
-		'NNA.Apps.Marketing.Digital.Staff.Group',	
-		'NNA.Apps.CustomerCare.Applications.Staff.Group', 
-		'NNA.Apps.CustomerCare.Applications.Head.Group',
-		'NNA.Apps.CustomerCare.Releasing.Staff.Group', 
-		'NNA.Apps.CustomerCare.Releasing.Head.Group',
-		'NNA.Apps.CustomerCare.Insurance.Staff.Group', 
-		'NNA.Apps.CustomerCare.Insurance.Head.Group',
-		'NNA.Apps.CustomerCare.OrderEntry&MailRoom.Staff.Group', 
-		'NNA.Apps.CustomerCare.OrderEntry&MailRoom.Head.Group',
-		'NNA.Apps.CustomerCare.Resolution.Staff.Group', 
-		'NNA.Apps.CustomerCare.Resolution.Head.Group',
-		'NNA.Apps.Operations.Staff.Group', 
-		'NNA.Apps.Operations.Head.Group',
-		'NNA.Apps.Seminar.Instructor&LiveScan.Head.Group', 
-		'NNA.Apps.Seminar.Instructor&LiveScan.Staff.Group',
-		'NNA.Apps.Seminar.Operations.Head.Group', 
-		'NNA.Apps.Seminar.Operations.Staff.Group'
- )
- GO
+     (
+         G.NAME NOT LIKE 'NNA.Apps.B2B%' AND 
+         G.NAME NOT LIKE 'NNA.Apps.ApiKey%' 
+      )
+      AND
+       G.NAME LIKE 'NNA.%'
+)
+
+
+GO
  
 /*------------------------------------------------------------------------------------
-Step 2. Create, Edit and Delete Permissions: - Adding Create, Edit and Delete and View permissions for below groups
+Step 2. Create, Edit and Delete Permissions: - Adding Create, Edit and Delete permissions for below groups
 
 Excel Group							Database Group(Mapping database record)		Group ID
 ----------------------------------------------------------------------------------------
@@ -77,9 +64,11 @@ Application Dev & BATeam User		NNA.Apps.IT.Eng.Head.Group					71
 									NNA.Apps.IT.Eng.Staff.Group					2
 ----------------------------------------------------------------------------------------*/
 
-DECLARE @ViewPermission Varchar(100)='%.View', @CreatePermission Varchar(100)='%.Create'
+DECLARE @ViewPermission Varchar(100)='%.View', @CreatePermission Varchar(100)='%.Create', @AddPermission Varchar(100)='%.Add'
 DECLARE @EditPermission Varchar(100)='%.Edit', @DeletePermission Varchar(100)='%.Delete'
+DECLARE @ManagePermission Varchar(100)='%.Manage', @DownloadPermission Varchar(100)='%.Download' , @RetrievePermission Varchar(100)='%.Retrieve'
 
+INSERT INTO [RBAC].[GROUPPERMISSION]
 SELECT G.ID 'GROUPID', P.ID 'PERMISSIONID' FROM [RBAC].[GROUP] G (NOLOCK)
 CROSS JOIN [RBAC].[PERMISSION] P (NOLOCK)
 LEFT JOIN [RBAC].[GROUPPERMISSION] GP (NOLOCK) ON G.ID = GP.GROUPID AND P.ID = GP.PERMISSIONID
@@ -92,8 +81,16 @@ AND
 		P.[NAMESPACE] LIKE @EditPermission
 		OR 
 		P.[NAMESPACE] LIKE @DeletePermission 
-        OR
-	   P.[NAMESPACE]  LIKE @ViewPermission
+		OR
+		P.[NAMESPACE] LIKE @ViewPermission
+		OR
+		P.[NAMESPACE] LIKE @AddPermission
+		OR
+		P.[NAMESPACE] LIKE @ManagePermission
+		OR
+		P.[NAMESPACE] LIKE @DownloadPermission
+		OR
+		P.[NAMESPACE] LIKE @RetrievePermission
 )
 AND G.NAME IN 
 (
